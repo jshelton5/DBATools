@@ -1,0 +1,71 @@
+USE [BuddysDBA]
+GO
+/****** Object:  StoredProcedure [notify].[SendBlockerNotification]    Script Date: 5/15/2025 7:28:25 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE OR ALTER PROCEDURE [notify].[SendBlockerNotification]
+AS
+BEGIN
+
+	SET NOCOUNT ON;
+
+	/*
+
+		This procedure depends on sp_whoisactive.
+
+		Download here: https://github.com/amachanic/sp_whoisactive/releases
+
+	*/
+
+	DROP TABLE IF EXISTS tmp.WhoIsActive;
+	CREATE TABLE tmp.WhoIsActive (
+		[dd hh:mm:ss.mss] varchar(15) null,
+		[session_id] smallint not null,
+		[sql_text] xml null,
+		login_name varchar(max) null,
+		wait_info varchar(max) null,
+		blocking_session_id int null,
+		host_name varchar(max) null,
+		database_name varchar(max) null,
+		program_name varchar(max) null,
+		start_time datetime null,
+		login_time datetime null,
+		collection_time datetime null
+	);
+
+	EXEC sp_whoisactive 
+		 @show_sleeping_spids=1,
+		 @destination_table='tmp.WhoIsActive',
+		 @output_column_list = '[dd hh:mm:ss.mss],	
+								[session_id],
+								[sql_text],
+								[login_name],
+								[wait_info],
+								[blocking_session_id],
+								[host_name],
+								[database_name],
+								[program_name],
+								[start_time],
+								[login_time],
+								[collection_time]'
+
+	DECLARE @BlockedSPIDs nvarchar(max) = null;
+
+	SELECT	@BlockedSPIDs = 'SPID: ' + convert(nvarchar(max),[session_id]) + ' has been blocked by SPID: ' + convert(nvarchar(max), [blocking_session_id]) + ' for over 2 minutes.' + char(13) + char(10)
+	FROM	tmp.WhoIsActive
+	WHERE	[blocking_session_id] is not null
+		AND dbo.JustDigits([wait_info]) > 120000;
+
+	IF @BlockedSPIDs is not null
+	BEGIN
+		EXEC notify.SendEmailNotification 
+			 @Recipients = 'jshelton@buddyrents.com;brent.buch@buddyrents.com',
+			 @Subject    = '!!! Blocked SPID on TRI-VRREPORTS-1 !!!',
+			 @Body		 = @BlockedSPIDs;
+
+	END
+END
+GO
