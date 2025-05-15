@@ -1,0 +1,31 @@
+USE [BuddysDBA]
+GO
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[AlertSQLServerRestarted]
+AS
+BEGIN
+
+/*
+	Stick this in a startup SQL Agent job
+	to get notified about SQL Server restart events
+*/
+
+	EXEC msdb.dbo.sp_send_dbmail @profile_name='Default',
+	                             @recipients='jshelton@buddyrents.com;smunoz@buddyrents.com;brent.buch@buddyrents.com',
+								 @importance  = 'High',
+								 @Subject='!!! ALERT: SQL Server Restarted !!!',
+								 @body='
+SURPRISE!  The SQL Server service was restarted!
+
+If this is unexpected, we should investigate why this happened!
+
+-------------
+--SQL Admin';
+
+END
+GO
