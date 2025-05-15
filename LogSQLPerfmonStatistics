@@ -1,0 +1,1337 @@
+USE [BuddysDBA]
+GO
+/****** Object:  StoredProcedure [frk].[ResetAllLoggedPerfmonStats]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP PROCEDURE IF EXISTS [frk].[ResetAllLoggedPerfmonStats]
+GO
+/****** Object:  StoredProcedure [frk].[RemoveObsoleteStats]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP PROCEDURE IF EXISTS [frk].[RemoveObsoleteStats]
+GO
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[frk].[BlitzFirstWaitStats_Categories]') AND type in (N'U'))
+ALTER TABLE [frk].[BlitzFirstWaitStats_Categories] DROP CONSTRAINT IF EXISTS [DF__BlitzFirs__Ignor__1FB8AE52]
+GO
+/****** Object:  Index [IX_ServerName_wait_type_CheckDate_Includes]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP INDEX IF EXISTS [IX_ServerName_wait_type_CheckDate_Includes] ON [frk].[BlitzFirstWaitStats]
+GO
+/****** Object:  Table [frk].[BlitzFirstStats]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP TABLE IF EXISTS [frk].[BlitzFirstStats]
+GO
+/****** Object:  Table [frk].[BlitzFirstBlitzCache]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP TABLE IF EXISTS [frk].[BlitzFirstBlitzCache]
+GO
+/****** Object:  View [frk].[BlitzFirstWaitStats_Deltas]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP VIEW IF EXISTS [frk].[BlitzFirstWaitStats_Deltas]
+GO
+/****** Object:  Table [frk].[BlitzFirstWaitStats_Categories]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP TABLE IF EXISTS [frk].[BlitzFirstWaitStats_Categories]
+GO
+/****** Object:  Table [frk].[BlitzFirstWaitStats]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP TABLE IF EXISTS [frk].[BlitzFirstWaitStats]
+GO
+/****** Object:  View [frk].[BlitzFirstPerfmonStats_Actuals]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP VIEW IF EXISTS [frk].[BlitzFirstPerfmonStats_Actuals]
+GO
+/****** Object:  View [frk].[BlitzFirstPerfmonStats_Deltas]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP VIEW IF EXISTS [frk].[BlitzFirstPerfmonStats_Deltas]
+GO
+/****** Object:  Table [frk].[BlitzFirstPerfmonStats]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP TABLE IF EXISTS [frk].[BlitzFirstPerfmonStats]
+GO
+/****** Object:  View [frk].[BlitzFirstFileStats_Deltas]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP VIEW IF EXISTS [frk].[BlitzFirstFileStats_Deltas]
+GO
+/****** Object:  Table [frk].[BlitzFirstFileStats]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP TABLE IF EXISTS [frk].[BlitzFirstFileStats]
+GO
+/****** Object:  UserDefinedFunction [frk].[UserConnections]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[UserConnections]
+GO
+/****** Object:  UserDefinedFunction [frk].[TempDBTransactionsSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[TempDBTransactionsSec]
+GO
+/****** Object:  UserDefinedFunction [frk].[ReCompilationsSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[ReCompilationsSec]
+GO
+/****** Object:  UserDefinedFunction [frk].[PageWritesSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[PageWritesSec]
+GO
+/****** Object:  UserDefinedFunction [frk].[PageReadsSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[PageReadsSec]
+GO
+/****** Object:  UserDefinedFunction [frk].[PageLifeExpectancy]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[PageLifeExpectancy]
+GO
+/****** Object:  UserDefinedFunction [frk].[MemoryGrantsPending]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[MemoryGrantsPending]
+GO
+/****** Object:  UserDefinedFunction [frk].[DeadlocksSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[DeadlocksSec]
+GO
+/****** Object:  UserDefinedFunction [frk].[CompilationsSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[CompilationsSec]
+GO
+/****** Object:  UserDefinedFunction [frk].[BufferCacheHitRatio]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[BufferCacheHitRatio]
+GO
+/****** Object:  UserDefinedFunction [frk].[BatchRequestsSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[BatchRequestsSec]
+GO
+/****** Object:  UserDefinedFunction [frk].[ActiveTempTables]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP FUNCTION IF EXISTS [frk].[ActiveTempTables]
+GO
+/****** Object:  Schema [frk]    Script Date: 5/15/2025 7:21:08 AM ******/
+DROP SCHEMA IF EXISTS [frk]
+GO
+/****** Object:  Schema [frk]    Script Date: 5/15/2025 7:21:08 AM ******/
+CREATE SCHEMA [frk]
+GO
+/****** Object:  UserDefinedFunction [frk].[ActiveTempTables]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE FUNCTION [frk].[ActiveTempTables]()
+RETURNS @ActiveTempTables TABLE (
+	ActiveTempTablesId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] INT,
+	ValueDelta INT
+)
+AS
+BEGIN
+	
+	WITH CounterValues
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = A.cntr_value,
+				ValueDelta		   = A.value_delta,
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:General Statistics'
+		  AND	counter_name  = 'Active Temp Tables'
+	)
+	INSERT	@ActiveTempTables
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	CollectionDateTime,
+			[Value],
+			ValueDelta
+	FROM	CounterValues as A
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  UserDefinedFunction [frk].[BatchRequestsSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE FUNCTION [frk].[BatchRequestsSec]()
+RETURNS @BatchRequestsSec TABLE (
+	BatchRequestsSecId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] INT,
+	ValueDelta INT
+)
+AS
+BEGIN
+	
+	WITH CounterValues
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = A.value_delta,
+				ValueDelta		   = A.value_per_second,
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:SQL Statistics'
+		  AND	counter_name  = 'Batch Requests/sec'
+	)
+	INSERT	@BatchRequestsSec
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	CollectionDateTime,
+			[Value],
+			ValueDelta
+	FROM	CounterValues as A
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  UserDefinedFunction [frk].[BufferCacheHitRatio]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+
+CREATE FUNCTION [frk].[BufferCacheHitRatio]()
+RETURNS @BufferCacheHitRatio TABLE (
+	BufferCacheHitRatioId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] decimal(18,4),
+	ValueDelta decimal(18,4)
+)
+AS
+BEGIN
+	
+	WITH BufferCacheHitRatio
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = convert(decimal(18,4),A.value_delta),
+				ValueDelta		   = convert(decimal(18,4),A.value_per_second),
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:Buffer Manager'
+		  AND	counter_name  = 'Buffer cache hit ratio'
+	),
+	BufferCacheHitRatioBase
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = convert(decimal(18,4),A.value_delta),
+				ValueDelta		   = convert(decimal(18,4),A.value_per_second),
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:Buffer Manager'
+		  AND	counter_name  = 'Buffer cache hit ratio base'
+	)
+	INSERT	@BufferCacheHitRatio
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	A.CollectionDateTime,
+			[Value]		= iif(round(B.[Value] / A.[Value],2,1) > 1.00,1.00 * 100,round(B.[Value] / A.[Value],2,1) * 100),
+			ValueDelta	= iif(round(B.ValueDelta / A.ValueDelta,2,1) > 1.00,1.00 * 100,round(B.ValueDelta / A.ValueDelta,2,1) * 100)
+	FROM	BufferCacheHitRatio as A
+			INNER JOIN BufferCacheHitRatioBase as B
+				ON B.CollectionDateTime = A.CollectionDateTime
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  UserDefinedFunction [frk].[CompilationsSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE FUNCTION [frk].[CompilationsSec]()
+RETURNS @CompilationsSec TABLE (
+	CompilationsSecId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] INT,
+	ValueDelta INT
+)
+AS
+BEGIN
+	
+	WITH CounterValues
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = A.value_delta,
+				ValueDelta		   = A.value_per_second,
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:SQL Statistics'
+		  AND	counter_name  = 'SQL Compilations/sec'
+	)
+	INSERT	@CompilationsSec
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	CollectionDateTime,
+			[Value],
+			ValueDelta
+	FROM	CounterValues as A
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  UserDefinedFunction [frk].[DeadlocksSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+CREATE FUNCTION [frk].[DeadlocksSec]()
+RETURNS @DeadlocksSec TABLE (
+	DeadlocksSecId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] INT,
+	ValueDelta INT
+)
+AS
+BEGIN
+	
+	WITH CounterValues
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = A.value_delta,
+				ValueDelta		   = A.value_per_second,
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:Locks'
+		  AND	counter_name  = 'Number of Deadlocks/sec'
+		  AND	instance_name = '_Total'
+	)
+	INSERT	@DeadlocksSec
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	CollectionDateTime,
+			[Value],
+			ValueDelta
+	FROM	CounterValues as A
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  UserDefinedFunction [frk].[MemoryGrantsPending]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+CREATE FUNCTION [frk].[MemoryGrantsPending]()
+RETURNS @MemoryGrantsPending TABLE (
+	MemoryGrantsPendingId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] INT,
+	ValueDelta INT
+)
+AS
+BEGIN
+	
+	WITH CounterValues
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = A.cntr_value,
+				ValueDelta		   = A.value_delta,
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:Memory Manager'
+		  AND	counter_name  = 'Memory Grants Pending'
+	)
+	INSERT	@MemoryGrantsPending
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	CollectionDateTime,
+			[Value],
+			ValueDelta
+	FROM	CounterValues as A
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  UserDefinedFunction [frk].[PageLifeExpectancy]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE FUNCTION [frk].[PageLifeExpectancy]()
+RETURNS @PageLifeExpectancy TABLE (
+	PageLifeExpectancyId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] INT,
+	ValueDelta INT
+)
+AS
+BEGIN
+	
+	WITH CounterValues
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = A.cntr_value,
+				ValueDelta		   = A.value_delta,
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:Buffer Manager'
+		  AND	counter_name  = 'Page life expectancy'
+	)
+	INSERT	@PageLifeExpectancy
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	CollectionDateTime,
+			[Value],
+			ValueDelta
+	FROM	CounterValues as A
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  UserDefinedFunction [frk].[PageReadsSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE FUNCTION [frk].[PageReadsSec]()
+RETURNS @PageReadsSec TABLE (
+	PageReadsSecId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] INT,
+	ValueDelta INT
+)
+AS
+BEGIN
+	
+	WITH CounterValues
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = A.value_delta,
+				ValueDelta		   = A.value_per_second,
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:Buffer Manager'
+		  AND	counter_name  = 'Page reads/sec'
+	)
+	INSERT	@PageReadsSec
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	CollectionDateTime,
+			[Value],
+			ValueDelta
+	FROM	CounterValues as A
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  UserDefinedFunction [frk].[PageWritesSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE FUNCTION [frk].[PageWritesSec]()
+RETURNS @PageWritesSec TABLE (
+	PageWritesSecId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] INT,
+	ValueDelta INT
+)
+AS
+BEGIN
+	
+	WITH CounterValues
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = A.value_delta,
+				ValueDelta		   = A.value_per_second,
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:Buffer Manager'
+		  AND	counter_name  = 'Page writes/sec'
+	)
+	INSERT	@PageWritesSec
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	CollectionDateTime,
+			[Value],
+			ValueDelta
+	FROM	CounterValues as A
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  UserDefinedFunction [frk].[ReCompilationsSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE FUNCTION [frk].[ReCompilationsSec]()
+RETURNS @ReCompilationsSec TABLE (
+	ReCompilationsSecId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] INT,
+	ValueDelta INT
+)
+AS
+BEGIN
+	
+	WITH CounterValues
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = A.value_delta,
+				ValueDelta		   = A.value_per_second,
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:SQL Statistics'
+		  AND	counter_name  = 'SQL Re-Compilations/sec'
+	)
+	INSERT	@ReCompilationsSec
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	CollectionDateTime,
+			[Value],
+			ValueDelta
+	FROM	CounterValues as A
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  UserDefinedFunction [frk].[TempDBTransactionsSec]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE FUNCTION [frk].[TempDBTransactionsSec]()
+RETURNS @TempDBTransactionsSec TABLE (
+	TempDBTransactionsSecId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] INT,
+	ValueDelta INT
+)
+AS
+BEGIN
+	
+	WITH CounterValues
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = A.value_delta,
+				ValueDelta		   = A.value_per_second,
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:Databases'
+		  AND	counter_name  = 'Transactions/sec'
+		  AND	instance_name = 'tempdb'
+	)
+	INSERT	@TempDBTransactionsSec
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	CollectionDateTime,
+			[Value],
+			ValueDelta
+	FROM	CounterValues as A
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  UserDefinedFunction [frk].[UserConnections]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE FUNCTION [frk].[UserConnections]()
+RETURNS @UserConnections TABLE (
+	UserConnectionsId int identity(1,1),
+	CollectionDateTime DATETIMEOFFSET,
+	[Value] INT,
+	ValueDelta INT
+)
+AS
+BEGIN
+	
+	WITH CounterValues
+	AS
+	(
+		SELECT	CollectionDateTime = A.CheckDate,
+				[Value]			   = A.cntr_value,
+				ValueDelta		   = A.value_delta,
+				SequenceNo		   = 
+					row_number() 
+					over (partition by A.CheckDate
+						  order by A.CheckDate asc)
+		FROM	frk.BlitzFirstPerfmonStats as A
+		WHERE	[object_name] = 'MSSQL$VERSIRENTSQL:General Statistics'
+		  AND	counter_name  = 'User Connections'
+	)
+	INSERT	@UserConnections
+	(
+		CollectionDateTime,
+		[Value],
+		ValueDelta
+	)
+	SELECT	CollectionDateTime,
+			[Value],
+			ValueDelta
+	FROM	CounterValues as A
+	ORDER BY A.SequenceNo ASC;
+
+	RETURN;
+
+END
+GO
+/****** Object:  Table [frk].[BlitzFirstFileStats]    Script Date: 5/15/2025 7:21:08 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [frk].[BlitzFirstFileStats](
+	[ID] [int] IDENTITY(1,1) NOT NULL,
+	[ServerName] [nvarchar](128) NULL,
+	[CheckDate] [datetimeoffset](7) NULL,
+	[DatabaseID] [int] NOT NULL,
+	[FileID] [int] NOT NULL,
+	[DatabaseName] [nvarchar](256) NULL,
+	[FileLogicalName] [nvarchar](256) NULL,
+	[TypeDesc] [nvarchar](60) NULL,
+	[SizeOnDiskMB] [bigint] NULL,
+	[io_stall_read_ms] [bigint] NULL,
+	[num_of_reads] [bigint] NULL,
+	[bytes_read] [bigint] NULL,
+	[io_stall_write_ms] [bigint] NULL,
+	[num_of_writes] [bigint] NULL,
+	[bytes_written] [bigint] NULL,
+	[PhysicalName] [nvarchar](520) NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[ID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  View [frk].[BlitzFirstFileStats_Deltas]    Script Date: 5/15/2025 7:21:09 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE VIEW [frk].[BlitzFirstFileStats_Deltas] AS 
+WITH RowDates as
+(
+        SELECT 
+                ROW_NUMBER() OVER (ORDER BY [ServerName], [CheckDate]) ID,
+                [CheckDate]
+        FROM [frk].[BlitzFirstFileStats]
+        GROUP BY [ServerName], [CheckDate]
+),
+CheckDates as
+(
+        SELECT ThisDate.CheckDate,
+               LastDate.CheckDate as PreviousCheckDate
+        FROM RowDates ThisDate
+        JOIN RowDates LastDate
+        ON ThisDate.ID = LastDate.ID + 1
+)
+     SELECT f.ServerName,
+            f.CheckDate,
+            f.DatabaseID,
+            f.DatabaseName,
+            f.FileID,
+            f.FileLogicalName,
+            f.TypeDesc,
+            f.PhysicalName,
+            f.SizeOnDiskMB,
+            DATEDIFF(ss, fPrior.CheckDate, f.CheckDate) AS ElapsedSeconds,
+            (f.SizeOnDiskMB - fPrior.SizeOnDiskMB) AS SizeOnDiskMBgrowth,
+            (f.io_stall_read_ms - fPrior.io_stall_read_ms) AS io_stall_read_ms,
+            io_stall_read_ms_average = CASE
+                                           WHEN(f.num_of_reads - fPrior.num_of_reads) = 0
+                                           THEN 0
+                                           ELSE(f.io_stall_read_ms - fPrior.io_stall_read_ms) /     (f.num_of_reads   -           fPrior.num_of_reads)
+                                       END,
+            (f.num_of_reads - fPrior.num_of_reads) AS num_of_reads,
+            (f.bytes_read - fPrior.bytes_read) / 1024.0 / 1024.0 AS megabytes_read,
+            (f.io_stall_write_ms - fPrior.io_stall_write_ms) AS io_stall_write_ms,
+            io_stall_write_ms_average = CASE
+                                            WHEN(f.num_of_writes - fPrior.num_of_writes) = 0
+                                            THEN 0
+                                            ELSE(f.io_stall_write_ms - fPrior.io_stall_write_ms) /         (f.num_of_writes   -       fPrior.num_of_writes)
+                                        END,
+            (f.num_of_writes - fPrior.num_of_writes) AS num_of_writes,
+            (f.bytes_written - fPrior.bytes_written) / 1024.0 / 1024.0 AS megabytes_written, 
+            f.ServerName + CAST(f.CheckDate AS NVARCHAR(50)) AS JoinKey
+     FROM   [frk].[BlitzFirstFileStats] f
+            INNER HASH JOIN CheckDates DATES ON f.CheckDate = DATES.CheckDate
+            INNER JOIN [frk].[BlitzFirstFileStats] fPrior ON f.ServerName =                 fPrior.ServerName
+                                                              AND f.DatabaseID = fPrior.DatabaseID
+                                                              AND f.FileID = fPrior.FileID
+                                                              AND fPrior.CheckDate =   DATES.PreviousCheckDate
+
+     WHERE  f.num_of_reads >= fPrior.num_of_reads
+            AND f.num_of_writes >= fPrior.num_of_writes
+            AND DATEDIFF(MI, fPrior.CheckDate, f.CheckDate) BETWEEN 1 AND 60;
+GO
+/****** Object:  Table [frk].[BlitzFirstPerfmonStats]    Script Date: 5/15/2025 7:21:09 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [frk].[BlitzFirstPerfmonStats](
+	[ID] [int] IDENTITY(1,1) NOT NULL,
+	[ServerName] [nvarchar](128) NULL,
+	[CheckDate] [datetimeoffset](7) NULL,
+	[object_name] [nvarchar](128) NOT NULL,
+	[counter_name] [nvarchar](128) NOT NULL,
+	[instance_name] [nvarchar](128) NULL,
+	[cntr_value] [bigint] NULL,
+	[cntr_type] [int] NOT NULL,
+	[value_delta] [bigint] NULL,
+	[value_per_second] [decimal](18, 2) NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[ID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  View [frk].[BlitzFirstPerfmonStats_Deltas]    Script Date: 5/15/2025 7:21:09 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE VIEW [frk].[BlitzFirstPerfmonStats_Deltas] AS 
+WITH RowDates as
+(
+        SELECT 
+                ROW_NUMBER() OVER (ORDER BY [ServerName], [CheckDate]) ID,
+                [CheckDate]
+        FROM [frk].[BlitzFirstPerfmonStats]
+        GROUP BY [ServerName], [CheckDate]
+),
+CheckDates as
+(
+        SELECT ThisDate.CheckDate,
+               LastDate.CheckDate as PreviousCheckDate
+        FROM RowDates ThisDate
+        JOIN RowDates LastDate
+        ON ThisDate.ID = LastDate.ID + 1
+)
+SELECT
+       pMon.[ServerName]
+      ,pMon.[CheckDate]
+      ,pMon.[object_name]
+      ,pMon.[counter_name]
+      ,pMon.[instance_name]
+      ,DATEDIFF(SECOND,pMonPrior.[CheckDate],pMon.[CheckDate]) AS ElapsedSeconds
+      ,pMon.[cntr_value]
+      ,pMon.[cntr_type]
+      ,(pMon.[cntr_value] - pMonPrior.[cntr_value]) AS cntr_delta
+      ,(pMon.cntr_value - pMonPrior.cntr_value) * 1.0 / DATEDIFF(ss, pMonPrior.CheckDate, pMon.CheckDate) AS cntr_delta_per_second
+      ,pMon.ServerName + CAST(pMon.CheckDate AS NVARCHAR(50)) AS JoinKey
+  FROM [frk].[BlitzFirstPerfmonStats] pMon
+  INNER HASH JOIN CheckDates Dates
+  ON Dates.CheckDate = pMon.CheckDate
+  JOIN [frk].[BlitzFirstPerfmonStats] pMonPrior
+  ON  Dates.PreviousCheckDate = pMonPrior.CheckDate
+      AND pMon.[ServerName]    = pMonPrior.[ServerName]   
+      AND pMon.[object_name]   = pMonPrior.[object_name]  
+      AND pMon.[counter_name]  = pMonPrior.[counter_name] 
+      AND pMon.[instance_name] = pMonPrior.[instance_name]
+    WHERE DATEDIFF(MI, pMonPrior.CheckDate, pMon.CheckDate) BETWEEN 1 AND 60;
+GO
+/****** Object:  View [frk].[BlitzFirstPerfmonStats_Actuals]    Script Date: 5/15/2025 7:21:09 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE VIEW [frk].[BlitzFirstPerfmonStats_Actuals] AS 
+WITH PERF_AVERAGE_BULK AS
+(
+    SELECT ServerName,
+           object_name,
+           instance_name,
+           counter_name,
+           CASE WHEN CHARINDEX('(', counter_name) = 0 THEN counter_name ELSE LEFT (counter_name, CHARINDEX('(',counter_name)-1) END    AS   counter_join,
+           CheckDate,
+           cntr_delta
+    FROM   [frk].[BlitzFirstPerfmonStats_Deltas]
+    WHERE  cntr_type IN(1073874176)
+    AND cntr_delta <> 0
+),
+PERF_LARGE_RAW_BASE AS
+(
+    SELECT ServerName,
+           object_name,
+           instance_name,
+           LEFT(counter_name, CHARINDEX('BASE', UPPER(counter_name))-1) AS counter_join,
+           CheckDate,
+           cntr_delta
+    FROM   [frk].[BlitzFirstPerfmonStats_Deltas]
+    WHERE  cntr_type IN(1073939712)
+    AND cntr_delta <> 0
+),
+PERF_AVERAGE_FRACTION AS
+(
+    SELECT ServerName,
+           object_name,
+           instance_name,
+           counter_name,
+           counter_name AS counter_join,
+           CheckDate,
+           cntr_delta
+    FROM   [frk].[BlitzFirstPerfmonStats_Deltas]
+    WHERE  cntr_type IN(537003264)
+    AND cntr_delta <> 0
+),
+PERF_COUNTER_BULK_COUNT AS
+(
+    SELECT ServerName,
+           object_name,
+           instance_name,
+           counter_name,
+           CheckDate,
+           cntr_delta / ElapsedSeconds AS cntr_value
+    FROM   [frk].[BlitzFirstPerfmonStats_Deltas]
+    WHERE  cntr_type IN(272696576, 272696320)
+    AND cntr_delta <> 0
+),
+PERF_COUNTER_RAWCOUNT AS
+(
+    SELECT ServerName,
+           object_name,
+           instance_name,
+           counter_name,
+           CheckDate,
+           cntr_value
+    FROM   [frk].[BlitzFirstPerfmonStats_Deltas]
+    WHERE  cntr_type IN(65792, 65536)
+)
+
+SELECT NUM.ServerName,
+       NUM.object_name,
+       NUM.counter_name,
+       NUM.instance_name,
+       NUM.CheckDate,
+       NUM.cntr_delta / DEN.cntr_delta AS cntr_value,
+       NUM.ServerName + CAST(NUM.CheckDate AS NVARCHAR(50)) AS JoinKey
+       
+FROM   PERF_AVERAGE_BULK AS NUM
+       JOIN PERF_LARGE_RAW_BASE AS DEN ON NUM.counter_join = DEN.counter_join
+                                          AND NUM.CheckDate = DEN.CheckDate
+                                          AND NUM.ServerName = DEN.ServerName
+                                          AND NUM.object_name = DEN.object_name
+                                          AND NUM.instance_name = DEN.instance_name
+                                          AND DEN.cntr_delta <> 0
+
+UNION ALL
+
+SELECT NUM.ServerName,
+       NUM.object_name,
+       NUM.counter_name,
+       NUM.instance_name,
+       NUM.CheckDate,
+       CAST((CAST(NUM.cntr_delta as DECIMAL(19)) / DEN.cntr_delta) as decimal(23,3))  AS cntr_value,
+       NUM.ServerName + CAST(NUM.CheckDate AS NVARCHAR(50)) AS JoinKey
+FROM   PERF_AVERAGE_FRACTION AS NUM
+       JOIN PERF_LARGE_RAW_BASE AS DEN ON NUM.counter_join = DEN.counter_join
+                                          AND NUM.CheckDate = DEN.CheckDate
+                                          AND NUM.ServerName = DEN.ServerName
+                                          AND NUM.object_name = DEN.object_name
+                                          AND NUM.instance_name = DEN.instance_name
+                                          AND DEN.cntr_delta <> 0
+UNION ALL
+
+SELECT ServerName,
+       object_name,
+       counter_name,
+       instance_name,
+       CheckDate,
+       cntr_value,
+       ServerName + CAST(CheckDate AS NVARCHAR(50)) AS JoinKey
+FROM   PERF_COUNTER_BULK_COUNT
+
+UNION ALL
+
+SELECT ServerName,
+       object_name,
+       counter_name,
+       instance_name,
+       CheckDate,
+       cntr_value,
+       ServerName + CAST(CheckDate AS NVARCHAR(50)) AS JoinKey
+FROM   PERF_COUNTER_RAWCOUNT;
+GO
+/****** Object:  Table [frk].[BlitzFirstWaitStats]    Script Date: 5/15/2025 7:21:09 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [frk].[BlitzFirstWaitStats](
+	[ID] [int] IDENTITY(1,1) NOT NULL,
+	[ServerName] [nvarchar](128) NULL,
+	[CheckDate] [datetimeoffset](7) NULL,
+	[wait_type] [nvarchar](60) NULL,
+	[wait_time_ms] [bigint] NULL,
+	[signal_wait_time_ms] [bigint] NULL,
+	[waiting_tasks_count] [bigint] NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[ID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  Table [frk].[BlitzFirstWaitStats_Categories]    Script Date: 5/15/2025 7:21:09 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [frk].[BlitzFirstWaitStats_Categories](
+	[WaitType] [nvarchar](60) NOT NULL,
+	[WaitCategory] [nvarchar](128) NOT NULL,
+	[Ignorable] [bit] NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[WaitType] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  View [frk].[BlitzFirstWaitStats_Deltas]    Script Date: 5/15/2025 7:21:09 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE VIEW [frk].[BlitzFirstWaitStats_Deltas] AS 
+WITH RowDates as
+(
+        SELECT 
+                ROW_NUMBER() OVER (ORDER BY [ServerName], [CheckDate]) ID,
+                [CheckDate]
+        FROM [frk].[BlitzFirstWaitStats]
+        GROUP BY [ServerName], [CheckDate]
+),
+CheckDates as
+(
+        SELECT ThisDate.CheckDate,
+               LastDate.CheckDate as PreviousCheckDate
+        FROM RowDates ThisDate
+        JOIN RowDates LastDate
+        ON ThisDate.ID = LastDate.ID + 1
+)
+SELECT w.ServerName, w.CheckDate, w.wait_type, COALESCE(wc.WaitCategory, 'Other') AS WaitCategory, COALESCE(wc.Ignorable,0) AS Ignorable
+, DATEDIFF(ss, wPrior.CheckDate, w.CheckDate) AS ElapsedSeconds
+, (w.wait_time_ms - wPrior.wait_time_ms) AS wait_time_ms_delta
+, (w.wait_time_ms - wPrior.wait_time_ms) / 60000.0 AS wait_time_minutes_delta
+, (w.wait_time_ms - wPrior.wait_time_ms) / 1000.0 / DATEDIFF(ss, wPrior.CheckDate, w.CheckDate) AS wait_time_minutes_per_minute
+, (w.signal_wait_time_ms - wPrior.signal_wait_time_ms) AS signal_wait_time_ms_delta
+, (w.waiting_tasks_count - wPrior.waiting_tasks_count) AS waiting_tasks_count_delta
+, w.ServerName + CAST(w.CheckDate AS NVARCHAR(50)) AS JoinKey
+FROM [frk].[BlitzFirstWaitStats] w
+INNER HASH JOIN CheckDates Dates
+ON Dates.CheckDate = w.CheckDate
+INNER JOIN [frk].[BlitzFirstWaitStats] wPrior ON w.ServerName = wPrior.ServerName AND w.wait_type = wPrior.wait_type AND Dates.PreviousCheckDate = wPrior.CheckDate
+LEFT OUTER JOIN [frk].[BlitzFirstWaitStats_Categories] wc ON w.wait_type = wc.WaitType
+WHERE DATEDIFF(MI, wPrior.CheckDate, w.CheckDate) BETWEEN 1 AND 60
+AND [w].[wait_time_ms] >= [wPrior].[wait_time_ms];
+GO
+/****** Object:  Table [frk].[BlitzFirstBlitzCache]    Script Date: 5/15/2025 7:21:09 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [frk].[BlitzFirstBlitzCache](
+	[ID] [bigint] IDENTITY(1,1) NOT NULL,
+	[ServerName] [nvarchar](258) NULL,
+	[CheckDate] [datetimeoffset](7) NULL,
+	[Version] [nvarchar](258) NULL,
+	[QueryType] [nvarchar](258) NULL,
+	[Warnings] [varchar](max) NULL,
+	[DatabaseName] [sysname] NOT NULL,
+	[SerialDesiredMemory] [float] NULL,
+	[SerialRequiredMemory] [float] NULL,
+	[AverageCPU] [bigint] NULL,
+	[TotalCPU] [bigint] NULL,
+	[PercentCPUByType] [money] NULL,
+	[CPUWeight] [money] NULL,
+	[AverageDuration] [bigint] NULL,
+	[TotalDuration] [bigint] NULL,
+	[DurationWeight] [money] NULL,
+	[PercentDurationByType] [money] NULL,
+	[AverageReads] [bigint] NULL,
+	[TotalReads] [bigint] NULL,
+	[ReadWeight] [money] NULL,
+	[PercentReadsByType] [money] NULL,
+	[AverageWrites] [bigint] NULL,
+	[TotalWrites] [bigint] NULL,
+	[WriteWeight] [money] NULL,
+	[PercentWritesByType] [money] NULL,
+	[ExecutionCount] [bigint] NULL,
+	[ExecutionWeight] [money] NULL,
+	[PercentExecutionsByType] [money] NULL,
+	[ExecutionsPerMinute] [money] NULL,
+	[PlanCreationTime] [datetime] NULL,
+	[LastExecutionTime] [datetime] NULL,
+	[PlanHandle] [varbinary](64) NULL,
+	[Remove Plan Handle From Cache]  AS (case when [PlanHandle] IS NOT NULL then ('DBCC FREEPROCCACHE ('+CONVERT([varchar](128),[PlanHandle],(1)))+');' else 'N/A' end),
+	[SqlHandle] [varbinary](64) NULL,
+	[Remove SQL Handle From Cache]  AS (case when [SqlHandle] IS NOT NULL then ('DBCC FREEPROCCACHE ('+CONVERT([varchar](128),[SqlHandle],(1)))+');' else 'N/A' end),
+	[SQL Handle More Info]  AS (case when [SqlHandle] IS NOT NULL then ('EXEC sp_BlitzCache @OnlySqlHandles = '''+CONVERT([varchar](128),[SqlHandle],(1)))+'''; ' else 'N/A' end),
+	[QueryHash] [binary](8) NULL,
+	[Query Hash More Info]  AS (case when [QueryHash] IS NOT NULL then ('EXEC sp_BlitzCache @OnlyQueryHashes = '''+CONVERT([varchar](32),[QueryHash],(1)))+'''; ' else 'N/A' end),
+	[QueryPlanHash] [binary](8) NULL,
+	[StatementStartOffset] [int] NULL,
+	[StatementEndOffset] [int] NULL,
+	[MinReturnedRows] [bigint] NULL,
+	[MaxReturnedRows] [bigint] NULL,
+	[AverageReturnedRows] [money] NULL,
+	[TotalReturnedRows] [bigint] NULL,
+	[QueryText] [nvarchar](max) NULL,
+	[QueryPlan] [xml] NULL,
+	[NumberOfPlans] [int] NULL,
+	[NumberOfDistinctPlans] [int] NULL,
+	[MinGrantKB] [bigint] NULL,
+	[MaxGrantKB] [bigint] NULL,
+	[MinUsedGrantKB] [bigint] NULL,
+	[MaxUsedGrantKB] [bigint] NULL,
+	[PercentMemoryGrantUsed] [money] NULL,
+	[AvgMaxMemoryGrant] [money] NULL,
+	[MinSpills] [bigint] NULL,
+	[MaxSpills] [bigint] NULL,
+	[TotalSpills] [bigint] NULL,
+	[AvgSpills] [money] NULL,
+	[QueryPlanCost] [float] NULL,
+	[JoinKey]  AS ([ServerName]+CONVERT([nvarchar](50),[CheckDate])),
+	[PlanCreationTimeHours]  AS (datediff(hour,CONVERT([datetimeoffset](7),[PlanCreationTime]),[CheckDate])),
+	[LastCompletionTime] [datetime] NULL,
+	[PlanGenerationNum] [bigint] NULL,
+	[Pattern] [nvarchar](20) NULL,
+ CONSTRAINT [PK_65CBCC78-D1A4-4497-9389-6FCD13845FA2] PRIMARY KEY CLUSTERED 
+(
+	[ID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+/****** Object:  Table [frk].[BlitzFirstStats]    Script Date: 5/15/2025 7:21:09 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [frk].[BlitzFirstStats](
+	[ID] [int] IDENTITY(1,1) NOT NULL,
+	[ServerName] [nvarchar](128) NULL,
+	[CheckDate] [datetimeoffset](7) NULL,
+	[CheckID] [int] NOT NULL,
+	[Priority] [tinyint] NOT NULL,
+	[FindingsGroup] [varchar](50) NOT NULL,
+	[Finding] [varchar](200) NOT NULL,
+	[URL] [varchar](200) NOT NULL,
+	[Details] [nvarchar](4000) NULL,
+	[HowToStopIt] [xml] NULL,
+	[QueryPlan] [xml] NULL,
+	[QueryText] [nvarchar](max) NULL,
+	[StartTime] [datetimeoffset](7) NULL,
+	[LoginName] [nvarchar](128) NULL,
+	[NTUserName] [nvarchar](128) NULL,
+	[OriginalLoginName] [nvarchar](128) NULL,
+	[ProgramName] [nvarchar](128) NULL,
+	[HostName] [nvarchar](128) NULL,
+	[DatabaseID] [int] NULL,
+	[DatabaseName] [nvarchar](128) NULL,
+	[OpenTransactionCount] [int] NULL,
+	[DetailsInt] [int] NULL,
+	[QueryHash] [binary](8) NULL,
+	[JoinKey]  AS ([ServerName]+CONVERT([nvarchar](50),[CheckDate])),
+PRIMARY KEY CLUSTERED 
+(
+	[ID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+SET ANSI_PADDING ON
+GO
+/****** Object:  Index [IX_ServerName_wait_type_CheckDate_Includes]    Script Date: 5/15/2025 7:21:09 AM ******/
+CREATE NONCLUSTERED INDEX [IX_ServerName_wait_type_CheckDate_Includes] ON [frk].[BlitzFirstWaitStats]
+(
+	[ServerName] ASC,
+	[wait_type] ASC,
+	[CheckDate] ASC
+)
+INCLUDE([wait_time_ms],[signal_wait_time_ms],[waiting_tasks_count]) WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+ALTER TABLE [frk].[BlitzFirstWaitStats_Categories] ADD  DEFAULT ((0)) FOR [Ignorable]
+GO
+/****** Object:  StoredProcedure [frk].[RemoveObsoleteStats]    Script Date: 5/15/2025 7:21:09 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE PROCEDURE [frk].[RemoveObsoleteStats]
+AS
+BEGIN
+
+	SET NOCOUNT ON;
+
+	EXEC dbo.PrintStatusProcedure @@procid;
+	EXEC dbo.PrintStatusLine;
+
+	/*
+		TABLE LIST:
+			[frk].[BlitzFirstBlitzCache]
+			[frk].[BlitzFirstFileStats]
+			[frk].[BlitzFirstPerfmonStats]
+			[frk].[BlitzFirstStats]
+			[frk].[BlitzFirstWaitStats]
+	*/
+
+	EXEC dbo.PrintStatus 'Processing frk.BlitzFirstBlitzCache.',1;
+
+	DELETE	frk.BlitzFirstBlitzCache
+	FROM	frk.BlitzFirstBlitzCache as A
+	WHERE	convert(date, CheckDate) < dateadd(day,-7,getdate());
+
+	EXEC dbo.PrintCount @@rowcount,'record(s) deleted',1;
+	--
+
+	EXEC dbo.PrintStatus 'Processing frk.BlitzFirstFileStats.',1;
+
+	DELETE	frk.BlitzFirstFileStats
+	FROM	frk.BlitzFirstFileStats as A
+	WHERE	convert(date, CheckDate) < dateadd(day,-30,getdate());
+
+	EXEC dbo.PrintCount @@rowcount,'record(s) deleted',1;
+	--
+
+	EXEC dbo.PrintStatus 'Processing frk.BlitzFirstPerfmonStats.',1;
+
+	DELETE	frk.BlitzFirstPerfmonStats
+	FROM	frk.BlitzFirstPerfmonStats as A
+	WHERE	convert(date, CheckDate) < dateadd(day,-30,getdate());
+
+	EXEC dbo.PrintCount @@rowcount,'record(s) deleted',1;
+	--
+
+	EXEC dbo.PrintStatus 'Processing frk.BlitzFirstStats.',1;
+
+	DELETE	frk.BlitzFirstStats
+	FROM	frk.BlitzFirstStats as A
+	WHERE	convert(date, CheckDate) < dateadd(day,-30,getdate());
+
+	EXEC dbo.PrintCount @@rowcount,'record(s) deleted',1;
+	--
+
+	EXEC dbo.PrintStatus 'Processing frk.BlitzFirstWaitStats.',1;
+
+	DELETE	frk.BlitzFirstWaitStats
+	FROM	frk.BlitzFirstWaitStats as A
+	WHERE	convert(date, CheckDate) < dateadd(day,-30,getdate());
+
+	EXEC dbo.PrintCount @@rowcount,'record(s) deleted',1;
+	--
+
+	EXEC dbo.PrintStatus 'Done.';
+
+END
+GO
+/****** Object:  StoredProcedure [frk].[ResetAllLoggedPerfmonStats]    Script Date: 5/15/2025 7:21:09 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE [frk].[ResetAllLoggedPerfmonStats]
+AS 
+BEGIN
+
+	TRUNCATE TABLE frk.BlitzFirstStats;
+	TRUNCATE TABLE frk.BlitzFirstWaitStats_Categories;
+	TRUNCATE TABLE frk.BlitzFirstBlitzCache;
+	TRUNCATE TABLE frk.BlitzFirstFileStats;
+	TRUNCATE TABLE frk.BlitzFirstWaitStats;
+	TRUNCATE TABLE frk.BlitzFirstPerfmonStats;
+
+END
+GO
+
+USE [msdb]
+GO
+
+/****** Object:  Job [BUDDYSDBA: Log Perfmon Statistics]    Script Date: 5/15/2025 7:22:22 AM ******/
+BEGIN TRANSACTION
+DECLARE @ReturnCode INT
+SELECT @ReturnCode = 0
+/****** Object:  JobCategory [Data Collector]    Script Date: 5/15/2025 7:22:23 AM ******/
+IF NOT EXISTS (SELECT name FROM msdb.dbo.syscategories WHERE name=N'Data Collector' AND category_class=1)
+BEGIN
+EXEC @ReturnCode = msdb.dbo.sp_add_category @class=N'JOB', @type=N'LOCAL', @name=N'Data Collector'
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+
+END
+
+DECLARE @jobId BINARY(16)
+EXEC @ReturnCode =  msdb.dbo.sp_add_job @job_name=N'BUDDYSDBA: Log Perfmon Statistics', 
+		@enabled=1, 
+		@notify_level_eventlog=0, 
+		@notify_level_email=0, 
+		@notify_level_netsend=0, 
+		@notify_level_page=0, 
+		@delete_level=0, 
+		@description=N'No description available.', 
+		@category_name=N'Data Collector', 
+		@owner_login_name=N'sa', @job_id = @jobId OUTPUT
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+/****** Object:  Step [Execute dbo.sp_blitzfirst]    Script Date: 5/15/2025 7:22:24 AM ******/
+EXEC @ReturnCode = msdb.dbo.sp_add_jobstep @job_id=@jobId, @step_name=N'Execute dbo.sp_blitzfirst', 
+		@step_id=1, 
+		@cmdexec_success_code=0, 
+		@on_success_action=3, 
+		@on_success_step_id=0, 
+		@on_fail_action=3, 
+		@on_fail_step_id=0, 
+		@retry_attempts=0, 
+		@retry_interval=0, 
+		@os_run_priority=0, @subsystem=N'TSQL', 
+		@command=N'EXEC dbo.sp_BlitzFirst 
+  @OutputDatabaseName = ''BuddysDBA'', 
+  @OutputSchemaName = ''frk'', 
+  @OutputTableName = ''BlitzFirstStats'',
+  @OutputTableNameFileStats = ''BlitzFirstFileStats'',
+  @OutputTableNamePerfmonStats = ''BlitzFirstPerfmonStats'',
+  @OutputTableNameWaitStats = ''BlitzFirstWaitStats'';
+', 
+		@database_name=N'BuddysDBA', 
+		@flags=0
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+/****** Object:  Step [Execute dbo.sp_BlitzCache]    Script Date: 5/15/2025 7:22:24 AM ******/
+EXEC @ReturnCode = msdb.dbo.sp_add_jobstep @job_id=@jobId, @step_name=N'Execute dbo.sp_BlitzCache', 
+		@step_id=2, 
+		@cmdexec_success_code=0, 
+		@on_success_action=3, 
+		@on_success_step_id=0, 
+		@on_fail_action=3, 
+		@on_fail_step_id=0, 
+		@retry_attempts=0, 
+		@retry_interval=0, 
+		@os_run_priority=0, @subsystem=N'TSQL', 
+		@command=N'EXEC sp_blitzcache
+	@OutputDatabaseName = ''BuddysDBA'', 
+	@OutputSchemaName = ''frk'', 
+	@OutputTableName = ''BlitzFirstBlitzCache'';
+', 
+		@database_name=N'BuddysDBA', 
+		@flags=0
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+/****** Object:  Step [Cleanup History]    Script Date: 5/15/2025 7:22:24 AM ******/
+EXEC @ReturnCode = msdb.dbo.sp_add_jobstep @job_id=@jobId, @step_name=N'Cleanup History', 
+		@step_id=3, 
+		@cmdexec_success_code=0, 
+		@on_success_action=1, 
+		@on_success_step_id=0, 
+		@on_fail_action=2, 
+		@on_fail_step_id=0, 
+		@retry_attempts=0, 
+		@retry_interval=0, 
+		@os_run_priority=0, @subsystem=N'TSQL', 
+		@command=N'EXEC frk.RemoveObsoleteStats;', 
+		@database_name=N'BuddysDBA', 
+		@flags=0
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+EXEC @ReturnCode = msdb.dbo.sp_update_job @job_id = @jobId, @start_step_id = 1
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+EXEC @ReturnCode = msdb.dbo.sp_add_jobschedule @job_id=@jobId, @name=N'Every 15 minutes every day', 
+		@enabled=1, 
+		@freq_type=4, 
+		@freq_interval=1, 
+		@freq_subday_type=4, 
+		@freq_subday_interval=15, 
+		@freq_relative_interval=0, 
+		@freq_recurrence_factor=0, 
+		@active_start_date=20231122, 
+		@active_end_date=99991231, 
+		@active_start_time=0, 
+		@active_end_time=235959, 
+		@schedule_uid=N'a0ca8f31-ad03-4458-a9cc-5144bc1a929a'
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+EXEC @ReturnCode = msdb.dbo.sp_add_jobserver @job_id = @jobId, @server_name = N'(local)'
+IF (@@ERROR <> 0 OR @ReturnCode <> 0) GOTO QuitWithRollback
+COMMIT TRANSACTION
+GOTO EndSave
+QuitWithRollback:
+    IF (@@TRANCOUNT > 0) ROLLBACK TRANSACTION
+EndSave:
+GO
+
+
