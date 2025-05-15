@@ -1,0 +1,78 @@
+USE [BuddysDBA]
+GO
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE OR ALTER PROCEDURE [dbo].[CheckDBMailStatus]
+AS
+BEGIN
+
+	SET NOCOUNT ON;
+
+/*
+	This procedure is designed to work with
+	Ola Hallengren's dbo.CommandLog table structure
+
+	https://ola.hallengren.com/scripts/MaintenanceSolution.sql
+*/
+
+	EXEC dbo.PrintStatusProcedure @@PROCID;
+	EXEC dbo.PrintStatusLine;
+
+	DECLARE @DBMailStatus TABLE (
+		DBMailStatusId		int identity(1,1),
+		[Status]			varchar(128)
+	);
+
+	--time the audit job ran
+	DECLARE @DateNow DATETIME = getdate();
+
+	INSERT @DBMailStatus
+		EXEC msdb.dbo.sysmail_help_status_sp;
+
+	IF NOT EXISTS 
+		(SELECT	TOP 1 [Status] 
+		 FROM	@DBMailStatus
+		 WHERE	[Status]='STARTED')
+	BEGIN
+		
+		EXEC dbo.PrintStatus 'DBMail is not running.  Starting.';
+
+		EXEC msdb.dbo.sysmail_start_sp
+
+		INSERT dbo.CommandLog
+		(
+			DatabaseName,
+			SchemaName,
+			ObjectName,
+			ObjectType,
+			Command,
+			CommandType,
+			StartTime,
+			EndTime,
+			ErrorNumber,
+			ErrorMessage
+		)
+		SELECT	DatabaseName	= 'msdb',
+				SchemaName		= 'dbo',
+				ObjectName		= 'db_mail',
+				ObjectType		= 'System Daemon Process',
+				Command			= 'EXEC msdb.dbo.sysmail_start_sp',
+				CommandType		= 'System Stored Procedure',
+				StartTime		= @DateNow,
+				EndTime			= getdate(),
+				ErrorNumber		= '16',
+				ErrorMessage	= 'The DBMail process had to be started by the auditing agent job because it was detected to not be running.';
+
+		EXEC dbo.PrintStatus 'DBMail started.';
+
+	END
+	ELSE
+	BEGIN
+		EXEC dbo.PrintStatus 'DB Mail is already running.';
+	END
+
+END
